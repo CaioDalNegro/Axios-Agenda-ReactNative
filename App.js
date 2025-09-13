@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, Button, FlatList, StyleSheet } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import axios from "axios";
 
 export default function App() {
@@ -12,17 +12,32 @@ export default function App() {
   // Função para formatar data e hora
   const getCurrentDateTime = () => {
     const now = new Date();
-    
-    // Formato da data: YYYY-MM-DD
-    const date = now.toISOString().split("T")[0];
-    
-    // Formato da hora: HH:MM
-    const time = now.toTimeString().split(" ")[0].slice(0, 5);
-    
+    const date = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const time = now.toTimeString().split(" ")[0].slice(0, 5); // HH:MM
     return { date, time };
   };
 
+  // Buscar agendamentos do json-server
+  const fetchAgendamentos = async () => {
+    try {
+      const response = await axios.get(API);
+      setAgendamento(response.data);
+    } catch (error) {
+      console.log("Error GET:", error.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchAgendamentos();
+  }, []);
+
+  // Função para criar agendamentos
   const addAgendamento = async () => {
+    if (!newTitle.trim() || !newAnotation.trim()) {
+      Alert.alert("Erro", "Preencha todos os campos");
+      return;
+    }
+
     const { date, time } = getCurrentDateTime();
 
     try {
@@ -31,7 +46,7 @@ export default function App() {
         anotacoes: newAnotation,
         data: date,
         hora: time,
-        status: "pendente" // status padrão
+        status: "pendente",
       });
 
       setAgendamento([...agendamento, response.data]);
@@ -42,9 +57,32 @@ export default function App() {
     }
   };
 
+  // Função para deletar agendamentos
+  const deleteAgendamento = async (id) => {
+    try {
+      await axios.delete(`${API}/${id}`);
+      setAgendamento(agendamento.filter(item => item.id !== id));
+    } catch (error) {
+      console.log("Error DELETE:", error.message);
+    }
+  };
+
+  const renderItem = ({ item }) => (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{item.titulo}</Text>
+      <Text>{item.anotacoes}</Text>
+      <Text>
+        {item.data} {item.hora} - <Text style={styles.status}>{item.status}</Text>
+      </Text>
+      <TouchableOpacity style={styles.deleteButton} onPress={() => deleteAgendamento(item.id)}>
+        <Text style={styles.deleteText}>Excluir</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Agenda de Compromissos - Adicionar agendamento</Text>
+      <Text style={styles.title}>Agenda de Compromissos</Text>
 
       <TextInput
         style={styles.input}
@@ -65,11 +103,8 @@ export default function App() {
       <FlatList
         data={agendamento}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <Text>
-            {item.titulo} - {item.anotacoes} - {item.data} - {item.hora} - {item.status}
-          </Text>
-        )}
+        renderItem={renderItem}
+        contentContainerStyle={{ paddingVertical: 10 }}
       />
     </View>
   );
@@ -91,5 +126,37 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 8,
     marginBottom: 10,
+    borderRadius: 5,
+  },
+  card: {
+    backgroundColor: "#f5f5f5",
+    padding: 15,
+    marginBottom: 10,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  status: {
+    fontWeight: "bold",
+    color: "orange",
+  },
+  deleteButton: {
+    marginTop: 10,
+    backgroundColor: "red",
+    padding: 8,
+    borderRadius: 5,
+    alignSelf: "flex-start",
+  },
+  deleteText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
 });
